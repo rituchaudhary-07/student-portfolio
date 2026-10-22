@@ -98,3 +98,17 @@ export const flushCacheApi = async () => {
   })
   return handleResponse(response)
 }
+
+// Practical 13: AI Integration API call
+export const generateAiDescription = async (title) => {
+  const response = await fetch(`${BASE_URL}/api/ai/generate-description`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ title }),
+  })
+  return handleResponse(response)
+}
+

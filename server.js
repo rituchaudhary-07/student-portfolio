@@ -273,6 +273,106 @@ app.delete('/tasks/:id', authMiddleware, async (req, res, next) => {
   }
 })
 
+// ==================== PRACTICAL 13: AI API INTEGRATION WITH GRACEFUL DEGRADATION ====================
+app.post('/api/ai/generate-description', authMiddleware, async (req, res) => {
+  try {
+    const { title } = req.body
+    if (!title || !title.trim()) {
+      return res.status(400).json({ message: 'Task title is required for AI generation' })
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY
+
+    // If an external AI API key is configured, call external AI service
+    if (apiKey) {
+      if (process.env.GEMINI_API_KEY) {
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `Generate a concise, professional 2-sentence task description for: "${title}". Be actionable. No quotes or markdown headings.`,
+                    },
+                  ],
+                },
+              ],
+            }),
+          }
+        )
+        const geminiData = await geminiRes.json()
+        const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+        if (text) {
+          return res.status(200).json({
+            description: text,
+            provider: 'Google Gemini 1.5 Flash',
+            fallback: false,
+          })
+        }
+      } else if (process.env.OPENAI_API_KEY) {
+        const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'user',
+                content: `Write a concise 2-sentence actionable task description for: "${title}". No quotes.`,
+              },
+            ],
+            max_tokens: 120,
+          }),
+        })
+        const openaiData = await openaiRes.json()
+        const text = openaiData?.choices?.[0]?.message?.content?.trim()
+        if (text) {
+          return res.status(200).json({
+            description: text,
+            provider: 'OpenAI GPT-4o-mini',
+            fallback: false,
+          })
+        }
+      }
+    }
+
+    // Graceful Fallback (Responsible AI & Offline Reliability):
+    // If no key or external API is offline/rate-limited, generate realistic context-aware task description
+    const lower = title.toLowerCase()
+    let fallbackText = `Execute required action items for "${title}" adhering to standard specifications, testing guidelines, and quality benchmarks.`
+    if (lower.includes('study') || lower.includes('learn') || lower.includes('read') || lower.includes('prepare')) {
+      fallbackText = `Review syllabus modules, summarize core theoretical concepts, and practice coding implementations for ${title}.`
+    } else if (lower.includes('bug') || lower.includes('fix') || lower.includes('error') || lower.includes('issue')) {
+      fallbackText = `Isolate root cause using logs, write regression unit tests, and deploy a verified code fix for ${title}.`
+    } else if (lower.includes('deploy') || lower.includes('docker') || lower.includes('build') || lower.includes('ci')) {
+      fallbackText = `Build container image, verify environment variables, run integration tests, and push release bundle for ${title}.`
+    }
+
+    return res.status(200).json({
+      description: fallbackText,
+      provider: 'AI Assistant (Graceful Degradation Mode)',
+      fallback: true,
+      disclaimer: 'Generated via fallback intelligent assistant to guarantee 100% uptime.',
+    })
+  } catch (error) {
+    console.error('AI Generation Error:', error.message)
+    // Graceful degradation required by Practical 13: core app never crashes on 3rd-party failure
+    return res.status(200).json({
+      description: `Complete all required action items and milestones for "${req.body?.title || 'this task'}".`,
+      provider: 'Fallback Recovery Mode',
+      fallback: true,
+      errorHandled: true,
+    })
+  }
+})
+
 // Global Error Handling Middleware
 app.use((err, req, res, _next) => {
   console.error(err)

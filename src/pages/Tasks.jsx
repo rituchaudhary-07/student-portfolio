@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { getTasks, createTask, updateTask, deleteTask } from '../api'
+import { getTasks, createTask, updateTask, deleteTask, generateAiDescription } from '../api'
 import Toast from '../components/Toast'
 import TaskItem from '../components/TaskItem'
 import PageFallback from '../components/PageFallback'
@@ -24,6 +24,8 @@ function Tasks() {
   const [form, setForm] = useState(emptyForm)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [loadingAi, setLoadingAi] = useState(false)
+  const [aiNotice, setAiNotice] = useState(null)
   const [showAnalytics, setShowAnalytics] = useState(false)
   const [toast, setToast] = useState({ message: '', type: 'success' })
   const navigate = useNavigate()
@@ -105,6 +107,38 @@ function Tasks() {
       showToast(error.message || 'Task could not be added. Make sure server is running.', 'error')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // Practical 13: Handle AI auto-generation with loading state and graceful handling
+  const handleGenerateAiDescription = async () => {
+    if (!form.title.trim()) {
+      showToast('Please enter a task title first so AI can understand your task.', 'error')
+      return
+    }
+
+    setLoadingAi(true)
+    setAiNotice(null)
+
+    try {
+      const data = await generateAiDescription(form.title)
+      if (data?.description) {
+        setForm((prev) => ({ ...prev, description: data.description }))
+        setAiNotice({
+          provider: data.provider || 'AI Assistant',
+          fallback: data.fallback,
+        })
+        showToast(
+          data.fallback
+            ? 'Suggestion generated via fallback assistant.'
+            : 'AI description generated successfully!',
+          'success'
+        )
+      }
+    } catch (error) {
+      showToast(error.message || 'AI service currently unavailable.', 'error')
+    } finally {
+      setLoadingAi(false)
     }
   }
 
@@ -220,13 +254,34 @@ function Tasks() {
         </label>
 
         <label>
-          <span>Description</span>
+          <div className="label-with-action">
+            <span>Description</span>
+            <button
+              type="button"
+              className="ai-generate-btn"
+              onClick={handleGenerateAiDescription}
+              disabled={loadingAi || submitting}
+              title="Click to auto-generate description with AI"
+            >
+              {loadingAi ? '✨ Generating Suggestion...' : '✨ Auto-Generate with AI'}
+            </button>
+          </div>
+
+          {aiNotice && (
+            <div className="ai-disclaimer-box">
+              <span className="ai-tag">🤖 {aiNotice.provider}</span>
+              <span className="ai-text">
+                AI suggestion generated. Review and edit before submitting.
+              </span>
+            </div>
+          )}
+
           <textarea
             name="description"
             value={form.description}
             onChange={handleChange}
             rows="4"
-            placeholder="Enter task details"
+            placeholder="Enter task details or click '✨ Auto-Generate with AI'"
             disabled={submitting}
           />
         </label>
