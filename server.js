@@ -274,7 +274,7 @@ app.delete('/tasks/:id', authMiddleware, async (req, res, next) => {
 })
 
 // Global Error Handling Middleware
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error(err)
   res.status(500).json({
     message: 'Internal server error',
