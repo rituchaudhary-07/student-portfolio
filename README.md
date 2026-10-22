@@ -1,5 +1,7 @@
 # Student Portfolio & Full-Stack Task Management Application
 
+[![CI Pipeline](https://github.com/rituchaudhary-07/student-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/rituchaudhary-07/student-portfolio/actions/workflows/ci.yml)
+
 A full-stack application built with React (Vite), Express.js, MongoDB, with in-memory caching, event-driven background processing, and Docker orchestration.
 
 ---
